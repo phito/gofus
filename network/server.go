@@ -6,7 +6,7 @@ import (
 	logging "github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("server")
+var log = logging.MustGetLogger("network")
 
 // A Server represents a TCP listener
 type Server struct {
@@ -33,11 +33,12 @@ func (server *Server) run() {
 
 	server.running = true
 	for server.running {
-		_, err := server.socket.Accept()
+		socket, err := server.socket.Accept()
 		if err != nil {
 			log.Error("Accept failed: ", err)
 			return
 		}
 		log.Info("New client connected")
+		NewConnection(socket)
 	}
 }

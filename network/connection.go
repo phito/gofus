@@ -1,21 +1,26 @@
 package network
 
-import "net"
+import (
+	"bufio"
+	"encoding/binary"
+	"encoding/json"
+	"net"
+)
 
 // A Connection represents a TCP connection
 type Connection struct {
-	socket *net.TCPConn
+	socket  net.Conn
+	channel chan string
 }
 
-// Open opens a TCP connection
-func (c *Connection) Open(address string) error {
-	tcpAddress, err := net.ResolveTCPAddr("tcp", address)
-	if err != nil {
-		return err
-	}
+// NewConnection creates and setups new transmission connection
+func NewConnection(socket net.Conn) (conn *Connection) {
+	conn = new(Connection)
+	conn.socket = socket
+	conn.channel = make(chan string)
 
-	c.socket, err = net.DialTCP("tcp", nil, tcpAddress)
-	return err
+	go conn.receive()
+	return
 }
 
 // Close closes the connection
@@ -26,4 +31,34 @@ func (c *Connection) Close() error {
 // Send sends an array of bytes
 func (c *Connection) Send(b []byte) (int, error) {
 	return c.socket.Write(b)
+}
+
+func (c *Connection) receive() {
+	defer close(c.channel)
+	for {
+		reader := bufio.NewReader(c.socket)
+		buffer := make([]byte, 2)
+
+		// read the size of the string
+		_, err := reader.Read(buffer)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+
+		size := binary.BigEndian.Uint16(buffer)
+		buffer = make([]byte, size)
+
+		// read the data string
+		_, err = reader.Read(buffer)
+		if err != nil {
+			log.Error(err.Error())
+			return
+		}
+		var dat map[string]interface{}
+		if err = json.Unmarshal(buffer, &dat); err != nil {
+			return
+		}
+		println(string(buffer))
+	}
 }
